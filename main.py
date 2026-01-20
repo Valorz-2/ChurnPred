@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 import shap  # The Explainable AI Library
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import MinMaxScaler, LabelEncoder
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report, ConfusionMatrixDisplay
 from imblearn.over_sampling import SMOTE
+from Dataset.data_preprocessing import load_and_preprocess
 
 # IMPORTING MODELS 
 # Ensure your 'models' folder has __init__.py and these files exist
@@ -14,47 +15,7 @@ from models.SVM import ChurnSVM
 from models.XGBoost import ChurnXGB
 
 
-# 1. DATA PREPROCESSING FUNCTION
-def load_and_preprocess(filepath):
-    print("Loading Data...")
-    df = pd.read_csv(filepath)
-    
-    # Cleaning
-    df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce').fillna(0)
-    if 'customerID' in df.columns:
-        df.drop(columns=['customerID'], inplace=True)
-        
-    # Encoding
-    le = LabelEncoder()
-    binary_cols = ['gender', 'Partner', 'Dependents', 'PhoneService', 'PaperlessBilling', 'Churn']
-    for col in binary_cols:
-        df[col] = le.fit_transform(df[col])
-        
-    df = pd.get_dummies(df, drop_first=True)
-    
-    # Scaling
-    X = df.drop('Churn', axis=1)
-    y = df['Churn']
-    
-    # Save column names for SHAP later
-    feature_names = X.columns.tolist()
-    
-    scaler = MinMaxScaler()
-    X_scaled = scaler.fit_transform(X)
-    X_scaled = pd.DataFrame(X_scaled, columns=feature_names)
-    
-    # Split
-    X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
-    
-    # SMOTE (Balancing)
-    print("Applying SMOTE...")
-    smote = SMOTE(random_state=42)
-    X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
-    
-    return X_train_res, X_test, y_train_res, y_test, feature_names
-
-
-# 2. MAIN EXECUTION LOOP
+#MAIN EXECUTION LOOP
 if __name__ == "__main__":
     # Update this path to match your actual file location
     csv_path = 'C:\\Academics\\Sem 4\\Machine learning\\ChurnPred\\Dataset\\Telco Customer Churn\\WA_Fn-UseC_-Telco-Customer-Churn.csv'
@@ -121,6 +82,19 @@ if __name__ == "__main__":
         y_pred = best_model.predict(X_test)
         
         print(classification_report(y_test, y_pred))
+
+        print(f"Plotting Confusion Matrix for {name}...")
+        # This automatically plots the matrix using the trained model and test data
+        disp = ConfusionMatrixDisplay.from_estimator(
+            best_model, 
+            X_test, 
+            y_test, 
+            cmap=plt.cm.Blues,
+            display_labels=["Stay", "Churn"]
+        )
+        plt.title(f"Confusion Matrix: {name}")
+        plt.grid(False) # Turn off grid lines for cleaner look
+        plt.show()
         
         # Capture XGBoost model for SHAP analysis
         if name == "XGBoost":
